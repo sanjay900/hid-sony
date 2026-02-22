@@ -66,7 +66,7 @@
 #define RB4_GUITAR_PS4_USB        BIT(18)
 #define RB4_GUITAR_PS4_BT         BIT(19)
 #define RB4_GUITAR_PS5            BIT(20)
-#define RB3_PS3_PRO_GUITAR        BIT(21)
+#define RB3_PS3_PRO_INSTRUMENT    BIT(21)
 
 #define SIXAXIS_CONTROLLER (SIXAXIS_CONTROLLER_USB | SIXAXIS_CONTROLLER_BT)
 #define MOTION_CONTROLLER (MOTION_CONTROLLER_USB | MOTION_CONTROLLER_BT)
@@ -1299,12 +1299,11 @@ out:
 	return ret;
 }
 
-
 /*
- * Sending HID_REQ_GET_REPORT enables the full report. Without this
- * pro guitars only report navigation events
+ * Sending HID_REQ_SET_REPORT enables the full report. Without this
+ * pro instruments only report navigation events
  */
-static int pro_guitar_enable_full_report(struct hid_device *hdev)
+static int pro_instrument_enable_full_report(struct hid_device *hdev)
 {
 	static const u8 report[] = { 0x00, 0xE9, 0x00, 0x89, 0x1B, 0x00, 0x00, 0x00, 0x02,
 								 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -2101,8 +2100,8 @@ static int sony_input_configured(struct hid_device *hdev,
 		}
 
 		sony_init_output_report(sc, sixaxis_send_output_report);
-	} else if (sc->quirks & RB3_PS3_PRO_GUITAR) {
-		ret = pro_guitar_enable_full_report(hdev);
+	} else if (sc->quirks & RB3_PS3_PRO_INSTRUMENT) {
+		ret = pro_instrument_enable_full_report(hdev);
 		if (ret < 0) {
 			hid_err(hdev, "Failed to enable full reports\n");
 			goto err_stop;
@@ -2441,8 +2440,6 @@ static const struct hid_device_id sony_devices[] = {
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB2_DRUMS_DONGLE),
 		.driver_data = PS_INSTRUMENT },
 	/* Rock Band 3 instruments */
-	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_MPA_DRUMS_MODE),
-		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB3_MPA_DRUMS_MODE),
 		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB3_MUSTANG_GUITAR),
@@ -2453,14 +2450,24 @@ static const struct hid_device_id sony_devices[] = {
 		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB3_MPA_SQUIRE_MODE),
 		.driver_data = PS_INSTRUMENT },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB3_KEYBOARD),
+		.driver_data = PS_INSTRUMENT },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB3_MPA_KEYBOARD_MODE),
+		.driver_data = PS_INSTRUMENT },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_MPA_DRUMS_MODE),
+		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_MUSTANG_GUITAR),
-		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_GUITAR },
+		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_SQUIRE_GUITAR),
-		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_GUITAR },
+		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_MPA_MUSTANG_MODE),
-		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_GUITAR },
+		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_MPA_SQUIRE_MODE),
-		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_GUITAR },
+		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_INSTRUMENT },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_KEYBOARD),
+		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_INSTRUMENT },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB3_MPA_KEYBOARD_MODE),
+		.driver_data = PS_INSTRUMENT | RB3_PS3_PRO_INSTRUMENT},
 	/* Rock Band 4 PS4 guitars */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_PDP, USB_DEVICE_ID_PDP_PS4_RIFFMASTER),
 		.driver_data = RB4_GUITAR_PS4_USB | PS_INSTRUMENT },
