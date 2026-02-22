@@ -62,7 +62,7 @@
 #define GH_GUITAR_CONTROLLER      BIT(14)
 #define GHL_GUITAR_PS3WIIU        BIT(15)
 #define GHL_GUITAR_PS4            BIT(16)
-#define RB2_INSTRUMENT            BIT(17)
+#define PS_INSTRUMENT            BIT(17)
 #define RB4_GUITAR_PS4_USB        BIT(18)
 #define RB4_GUITAR_PS4_BT         BIT(19)
 #define RB4_GUITAR_PS5            BIT(20)
@@ -428,7 +428,7 @@ static const unsigned int rb4_absmap[] = {
 	[0x31] = ABS_Y,
 };
 
-static const unsigned int rb_keymap[] = {
+static const unsigned int instrument_keymap[] = {
 	[0x1] = BTN_WEST, /* Square */
 	[0x2] = BTN_SOUTH, /* Cross */
 	[0x3] = BTN_EAST, /* Circle */
@@ -626,17 +626,17 @@ static int gh_guitar_mapping(struct hid_device *hdev, struct hid_input *hi,
 	return 0;
 }
 
-static int rb2_instrument_mapping(struct hid_device *hdev, struct hid_input *hi,
+static int ps_instrument_mapping(struct hid_device *hdev, struct hid_input *hi,
 			  struct hid_field *field, struct hid_usage *usage,
 			  unsigned long **bit, int *max)
 {
 	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_BUTTON) {
 		unsigned int key = usage->hid & HID_USAGE;
 
-		if (key >= ARRAY_SIZE(rb_keymap))
+		if (key >= ARRAY_SIZE(instrument_keymap))
 			return 0;
 
-		key = rb_keymap[key];
+		key = instrument_keymap[key];
 		hid_map_usage_clear(hi, usage, bit, max, EV_KEY, key);
 		return 1;
 	}
@@ -648,16 +648,7 @@ static int rb4_guitar_mapping(struct hid_device *hdev, struct hid_input *hi,
 			  struct hid_field *field, struct hid_usage *usage,
 			  unsigned long **bit, int *max)
 {
-	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_BUTTON) {
-		unsigned int key = usage->hid & HID_USAGE;
-
-		if (key >= ARRAY_SIZE(rb_keymap))
-			return 0;
-
-		key = rb_keymap[key];
-		hid_map_usage_clear(hi, usage, bit, max, EV_KEY, key);
-		return 1;
-	} else if ((usage->hid & HID_USAGE_PAGE) == HID_UP_GENDESK) {
+	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_GENDESK) {
 		unsigned int abs = usage->hid & HID_USAGE;
 
 		/* Let the HID parser deal with the HAT. */
@@ -1120,14 +1111,14 @@ static int sony_mapping(struct hid_device *hdev, struct hid_input *hi,
 	if (sc->quirks & GH_GUITAR_CONTROLLER)
 		return gh_guitar_mapping(hdev, hi, field, usage, bit, max);
 
-	if (sc->quirks & RB2_INSTRUMENT)
-		return rb2_instrument_mapping(hdev, hi, field, usage, bit, max);
-
 	if (sc->quirks & (RB4_GUITAR_PS4_USB | RB4_GUITAR_PS4_BT))
 		return rb4_guitar_mapping(hdev, hi, field, usage, bit, max);
 
 	if (sc->quirks & RB4_GUITAR_PS5)
 		return rb4_guitar_mapping(hdev, hi, field, usage, bit, max);
+
+	if (sc->quirks & PS_INSTRUMENT)
+		return ps_instrument_mapping(hdev, hi, field, usage, bit, max);
 
 	/* Let hid-core decide for the others */
 	return 0;
@@ -2390,47 +2381,47 @@ static const struct hid_device_id sony_devices[] = {
 		.driver_data = NSG_MR7U_REMOTE_BT },
 	/* Guitar Hero Live PS3 and Wii U guitar dongles */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3WIIU_GHLIVE_DONGLE),
-		.driver_data = GHL_GUITAR_PS3WIIU | GH_GUITAR_CONTROLLER },
+		.driver_data = GHL_GUITAR_PS3WIIU | GH_GUITAR_CONTROLLER | PS_INSTRUMENT },
 	/* Guitar Hero PC Guitar Dongle */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_REDOCTANE, USB_DEVICE_ID_REDOCTANE_GUITAR_DONGLE),
-		.driver_data = GH_GUITAR_CONTROLLER },
+		.driver_data = GH_GUITAR_CONTROLLER | PS_INSTRUMENT },
 	/* Guitar Hero World Tour PS3 Guitar Dongle */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_GH_GUITAR_DONGLE),
-		.driver_data = GH_GUITAR_CONTROLLER },
+		.driver_data = GH_GUITAR_CONTROLLER | PS_INSTRUMENT },
 	/* Guitar Hero Live PS4 guitar dongles */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_REDOCTANE, USB_DEVICE_ID_REDOCTANE_PS4_GHLIVE_DONGLE),
-		.driver_data = GHL_GUITAR_PS4 | GH_GUITAR_CONTROLLER },
+		.driver_data = GHL_GUITAR_PS4 | GH_GUITAR_CONTROLLER | PS_INSTRUMENT },
 	/* Rock Band 2 instruments
 	 * Nintendo Wii instruments are included in `hid-sony` because `hid-nintendo`
 	 * is for the newer Nintendo Switch, and the Wii instruments use the same
 	 * protocol as their Sony PlayStation 3 cousins.
 	 */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB2_GUITAR_DONGLE),
-		.driver_data = RB2_INSTRUMENT },
+		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_HARMONIX, USB_DEVICE_ID_HARMONIX_WII_RB2_DRUMS_DONGLE),
-		.driver_data = RB2_INSTRUMENT },
+		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB2_GUITAR_DONGLE),
-		.driver_data = RB2_INSTRUMENT },
+		.driver_data = PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_RB2_DRUMS_DONGLE),
-		.driver_data = RB2_INSTRUMENT },
+		.driver_data = PS_INSTRUMENT },
 	/* Rock Band 4 PS4 guitars */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_PDP, USB_DEVICE_ID_PDP_PS4_RIFFMASTER),
-		.driver_data = RB4_GUITAR_PS4_USB },
+		.driver_data = RB4_GUITAR_PS4_USB | PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_CRKD, USB_DEVICE_ID_CRKD_PS4_GIBSON_SG),
-		.driver_data = RB4_GUITAR_PS4_USB },
+		.driver_data = RB4_GUITAR_PS4_USB | PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_CRKD, USB_DEVICE_ID_CRKD_PS4_GIBSON_SG_DONGLE),
-		.driver_data = RB4_GUITAR_PS4_USB },
+		.driver_data = RB4_GUITAR_PS4_USB | PS_INSTRUMENT },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_PDP, USB_DEVICE_ID_PDP_PS4_JAGUAR),
-		.driver_data = RB4_GUITAR_PS4_BT },
+		.driver_data = RB4_GUITAR_PS4_BT | PS_INSTRUMENT },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MADCATZ, USB_DEVICE_ID_MADCATZ_PS4_STRATOCASTER),
-		.driver_data = RB4_GUITAR_PS4_BT },
+		.driver_data = RB4_GUITAR_PS4_BT | PS_INSTRUMENT },
 	/* Rock Band 4 PS5 guitars */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_PDP, USB_DEVICE_ID_PDP_PS5_RIFFMASTER),
-		.driver_data = RB4_GUITAR_PS5 },
+		.driver_data = RB4_GUITAR_PS5 | PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_CRKD, USB_DEVICE_ID_CRKD_PS5_GIBSON_SG),
-		.driver_data = RB4_GUITAR_PS5 },
+		.driver_data = RB4_GUITAR_PS5 | PS_INSTRUMENT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_CRKD, USB_DEVICE_ID_CRKD_PS5_GIBSON_SG_DONGLE),
-		.driver_data = RB4_GUITAR_PS5 },
+		.driver_data = RB4_GUITAR_PS5 | PS_INSTRUMENT },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, sony_devices);
