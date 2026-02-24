@@ -15,6 +15,7 @@
  *  Copyright (c) 2020-2026 Sanjay Govind <sanjay.govind9@gmail.com>
  *  Copyright (c) 2021 Daniel Nguyen <daniel.nguyen.1@ens.etsmtl.ca>
  *  Copyright (c) 2026 Rosalie Wanders <rosalie@mailbox.org>
+ *  Copyright (c) 2026 Brenton Simpson <appsforartists@google.com>
  */
 
 /*
