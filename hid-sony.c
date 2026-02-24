@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- *  HID driver for Sony / PS2 / PS3 / PS4 BD devices.
+ *  HID driver for Sony / PS2 / PS3 / PS4 / PS5 BD devices.
  *
  *  Copyright (c) 1999 Andreas Gal
  *  Copyright (c) 2000-2005 Vojtech Pavlik <vojtech@suse.cz>
@@ -2577,5 +2577,5 @@ static void __exit sony_exit(void)
 module_init(sony_init);
 module_exit(sony_exit);
 
-MODULE_DESCRIPTION("HID driver for Sony / PS2 / PS3 / PS4 BD devices");
+MODULE_DESCRIPTION("HID driver for Sony / PS2 / PS3 / PS4 / PS5 BD devices");
 MODULE_LICENSE("GPL");
