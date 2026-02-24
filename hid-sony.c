@@ -87,9 +87,6 @@
 
 /* The PS3/Wii U dongles require a poke every 10 seconds, but the PS4
  * requires one every 8 seconds. Using 8 seconds for all for simplicity.
- * Pro instruments only require a poke when the guitar is powered on
- * but it's much easier to also just send reporst every 8 seconds there
- * too.
  */
 #define GHL_GUITAR_POKE_INTERVAL 8 /* In seconds */
 #define GUITAR_TILT_USAGE 44
@@ -113,15 +110,12 @@ static const char ghl_ps4_magic_data[] = {
 	0x30, 0x02, 0x08, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-
-/* Magic data for the RB Pro instruments sniffed with a USB protocol
- * analyzer.
+/* Pro Instruments require sending a report once an instrument
+ * is connected to its dongle. We need to retry sending these
+ * reports, but to avoid doing this too often we delay the 
+ * retries
  */
-static const char pro_instrument_magic_data[] = { 0xE9, 0x00, 0x89, 0x1B, 0x00, 0x00, 0x00, 0x02,
-								0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-								0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00,
-								0x00, 0x00, 0x89, 0x00, 0x00, 0x00, 0x00, 0x00,
-								0xE9, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+#define RB_PRO_INSTRUMENT_POKE_RETRY_INTERVAL 8 /* In seconds */
 
 /* PS/3 Motion controller */
 static const u8 motion_rdesc[] = {
@@ -563,9 +557,12 @@ struct sony_sc {
 	u8 led_delay_off[MAX_LEDS];
 	u8 led_count;
 
-	/* Pro Instruments + GH Live */
-	struct urb *instrument_poke_urb;
-	struct timer_list instrument_poke_timer;
+	/* GH Live */
+	struct urb *ghl_urb;
+	struct timer_list ghl_poke_timer;
+
+	/* Pro Instruments */
+	unsigned long pro_poke_jiffies;
 };
 
 static void sony_set_leds(struct sony_sc *sc);
@@ -585,33 +582,33 @@ static inline void sony_schedule_work(struct sony_sc *sc,
 	}
 }
 
-static void instrument_magic_poke_cb(struct urb *urb)
+static void ghl_magic_poke_cb(struct urb *urb)
 {
 	struct sony_sc *sc = urb->context;
 
 	if (urb->status < 0)
 		hid_err(sc->hdev, "URB transfer failed : %d", urb->status);
 
-	mod_timer(&sc->instrument_poke_timer, jiffies + GHL_GUITAR_POKE_INTERVAL*HZ);
+	mod_timer(&sc->ghl_poke_timer, jiffies + GHL_GUITAR_POKE_INTERVAL*HZ);
 }
 
-static void instrument_poke(struct timer_list *t)
+static void ghl_magic_poke(struct timer_list *t)
 {
 	int ret;
-	struct sony_sc *sc = timer_container_of(sc, t, instrument_poke_timer);
+	struct sony_sc *sc = timer_container_of(sc, t, ghl_poke_timer);
 
-	ret = usb_submit_urb(sc->instrument_poke_urb, GFP_ATOMIC);
+	ret = usb_submit_urb(sc->ghl_urb, GFP_ATOMIC);
 	if (ret < 0)
 		hid_err(sc->hdev, "usb_submit_urb failed: %d", ret);
 }
 
-static int instrument_poke_init_urb(struct sony_sc *sc, struct usb_device *usbdev,
-					   char report_id, char report_type, const char poke_magic_data[], u16 poke_size)
+static int ghl_init_urb(struct sony_sc *sc, struct usb_device *usbdev,
+					   const char ghl_magic_data[], u16 poke_size)
 {
 	struct usb_ctrlrequest *cr;
 	u8 *databuf;
 	unsigned int pipe;
-	u16 ghl_magic_value = (((report_type + 1) << 8) | report_id);
+	u16 ghl_magic_value = (((HID_OUTPUT_REPORT + 1) << 8) | ghl_magic_data[0]);
 
 	pipe = usb_sndctrlpipe(usbdev, 0);
 
@@ -629,12 +626,41 @@ static int instrument_poke_init_urb(struct sony_sc *sc, struct usb_device *usbde
 	cr->wValue = cpu_to_le16(ghl_magic_value);
 	cr->wIndex = 0;
 	cr->wLength = cpu_to_le16(poke_size);
-	memcpy(databuf, poke_magic_data, poke_size);
+	memcpy(databuf, ghl_magic_data, poke_size);
 	usb_fill_control_urb(
-		sc->instrument_poke_urb, usbdev, pipe,
+		sc->ghl_urb, usbdev, pipe,
 		(unsigned char *) cr, databuf, poke_size,
-		instrument_magic_poke_cb, sc);
+		ghl_magic_poke_cb, sc);
 	return 0;
+}
+
+
+
+/*
+ * Sending HID_REQ_SET_REPORT enables the full report. Without this
+ * pro instruments only report navigation events
+ */
+static int pro_instrument_enable_full_report(struct sony_sc *sc)
+{
+	struct hid_device *hdev = sc->hdev;
+	static const u8 report[] = { 0x00, 0xE9, 0x00, 0x89, 0x1B, 0x00, 0x00, 0x00, 0x02,
+								 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+								 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00,
+								 0x00, 0x00, 0x89, 0x00, 0x00, 0x00, 0x00, 0x00,
+								 0xE9, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	u8 *buf;
+	int ret;
+
+	buf = kmemdup(report, sizeof(report), GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = hid_hw_raw_request(hdev, buf[0], buf, sizeof(report),
+				  HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
+
+	kfree(buf);
+
+	return ret;
 }
 
 static int djh_turntable_mapping(struct hid_device *hdev, struct hid_input *hi,
@@ -1120,6 +1146,13 @@ static int sony_raw_event(struct hid_device *hdev, struct hid_report *report,
 		rb4_ps5_guitar_parse_report(sc, rd, size);
 		return 1;
 	} 
+
+	// Pro instruments set rd[24] to 0xE0 when they are sending full reports, and 0x02
+	// when only sending navigation
+	if ((sc->quirks & RB3_PS3_PRO_INSTRUMENT) && rd[24] == 0x02 && time_after(jiffies, sc->pro_poke_jiffies)) {
+		sc->pro_poke_jiffies = jiffies + (RB_PRO_INSTRUMENT_POKE_RETRY_INTERVAL * HZ);
+		pro_instrument_enable_full_report(sc);
+	}
 
 	if (sc->defer_initialization) {
 		sc->defer_initialization = 0;
@@ -2316,7 +2349,11 @@ static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		goto err;
 	}
 
-	if (sc->quirks & (GHL_GUITAR_PS3WIIU | GHL_GUITAR_PS4 | RB3_PS3_PRO_INSTRUMENT)) {
+	if (sc->quirks & RB3_PS3_PRO_INSTRUMENT) {
+		sc->pro_poke_jiffies = 0;
+	}
+
+	if (sc->quirks & (GHL_GUITAR_PS3WIIU | GHL_GUITAR_PS4)) {
 		if (!hid_is_usb(hdev)) {
 			ret = -EINVAL;
 			goto err;
@@ -2324,35 +2361,32 @@ static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
 
 		usbdev = to_usb_device(sc->hdev->dev.parent->parent);
 
-		sc->instrument_poke_urb = usb_alloc_urb(0, GFP_ATOMIC);
-		if (!sc->instrument_poke_urb) {
+		sc->ghl_urb = usb_alloc_urb(0, GFP_ATOMIC);
+		if (!sc->ghl_urb) {
 			ret = -ENOMEM;
 			goto err;
 		}
 
 		if (sc->quirks & GHL_GUITAR_PS3WIIU)
-			ret = instrument_poke_init_urb(sc, usbdev, ghl_ps3wiiu_magic_data[0], HID_OUTPUT_REPORT, ghl_ps3wiiu_magic_data,
+			ret = ghl_init_urb(sc, usbdev, ghl_ps3wiiu_magic_data,
 							   ARRAY_SIZE(ghl_ps3wiiu_magic_data));
 		else if (sc->quirks & GHL_GUITAR_PS4)
-			ret = instrument_poke_init_urb(sc, usbdev, ghl_ps4_magic_data[0], HID_OUTPUT_REPORT, ghl_ps4_magic_data,
+			ret = ghl_init_urb(sc, usbdev, ghl_ps4_magic_data,
 							   ARRAY_SIZE(ghl_ps4_magic_data));
-		else if (sc->quirks & RB3_PS3_PRO_INSTRUMENT)
-			ret = instrument_poke_init_urb(sc, usbdev, 0x00, HID_FEATURE_REPORT, pro_instrument_magic_data,
-							   ARRAY_SIZE(pro_instrument_magic_data));
 		if (ret) {
 			hid_err(hdev, "error preparing URB\n");
 			goto err;
 		}
 
-		timer_setup(&sc->instrument_poke_timer, instrument_poke, 0);
-		mod_timer(&sc->instrument_poke_timer,
+		timer_setup(&sc->ghl_poke_timer, ghl_magic_poke, 0);
+		mod_timer(&sc->ghl_poke_timer,
 			  jiffies + GHL_GUITAR_POKE_INTERVAL*HZ);
 	}
 
 	return ret;
 
 err:
-	usb_free_urb(sc->instrument_poke_urb);
+	usb_free_urb(sc->ghl_urb);
 
 	hid_hw_stop(hdev);
 	return ret;
@@ -2363,8 +2397,8 @@ static void sony_remove(struct hid_device *hdev)
 	struct sony_sc *sc = hid_get_drvdata(hdev);
 
 	if (sc->quirks & (GHL_GUITAR_PS3WIIU | GHL_GUITAR_PS4)) {
-		timer_delete_sync(&sc->instrument_poke_timer);
-		usb_free_urb(sc->instrument_poke_urb);
+		timer_delete_sync(&sc->ghl_poke_timer);
+		usb_free_urb(sc->ghl_urb);
 	}
 
 	hid_hw_close(hdev);
