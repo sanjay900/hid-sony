@@ -2464,9 +2464,12 @@ static const struct hid_device_id sony_devices[] = {
 	/* Guitar Hero PC Guitar Dongle */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_REDOCTANE, USB_DEVICE_ID_REDOCTANE_GUITAR_DONGLE),
 		.driver_data = GH_GUITAR_TILT | INSTRUMENT },
-	/* Guitar Hero World Tour PS3 Guitar Dongle */
+	/* Guitar Hero PS3 Guitar Dongle */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_GH_GUITAR),
 		.driver_data = GH_GUITAR_TILT | INSTRUMENT },
+	/* Guitar Hero PS3 Drum Dongle */
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_GH_DRUMS),
+		.driver_data = INSTRUMENT },
 	/* DJ Hero PS3 Guitar Dongle */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY_RHYTHM, USB_DEVICE_ID_SONY_PS3_DJH_TURNTABLE),
 		.driver_data = PS3_DJH_TURNTABLE | INSTRUMENT },
